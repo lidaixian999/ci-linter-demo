@@ -21,4 +21,4 @@ jobs:
         run: flake8 . --count --show-source --statistics
 
       - name: Run unit tests
-        run: pytest
+        run:  python -m pytest -v
