@@ -20,3 +20,4 @@ def test_add_exception():
     """异常情况：传入不支持的类型（如字符串）应抛出 TypeError"""
     with pytest.raises(TypeError):
         add("hello", 2)
+        
