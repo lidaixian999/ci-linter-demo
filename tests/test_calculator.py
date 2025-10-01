@@ -1,6 +1,7 @@
 # tests/test_calculator.py
 import pytest
 from calculator import add
+from calculator import subtract
 
 
 def test_add_normal():
@@ -20,3 +21,9 @@ def test_add_exception():
     """异常情况：传入不支持的类型（如字符串）应抛出 TypeError"""
     with pytest.raises(TypeError):
         add("hello", 2)
+
+
+def test_subtract():
+    assert subtract(5, 2) == 3
+    assert subtract(0, 0) == 0
+    assert subtract(-1, -3) == 2
