@@ -19,3 +19,6 @@ jobs:
 
       - name: Run flake8 linter
         run: flake8 . --count --show-source --statistics
+
+      - name: Run unit tests
+        run: pytest
