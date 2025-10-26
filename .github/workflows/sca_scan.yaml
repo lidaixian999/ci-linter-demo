@@ -1,0 +1,82 @@
+# .github/workflows/sca-scan.yml
+
+# 1. 定义 Workflow 名称
+name: SCA Scan with Syft and Grype
+
+# 2. 定义触发事件 (Triggers)
+on:
+  push:
+    branches: [ "main", "master", "develop" ] # 当推送到 main/master/develop 分支时触发
+  pull_request:
+    # branches: [ "main" ] # 可选：只在 PR 到 main 分支时触发
+    types: [opened, synchronize, reopened] # 当 PR 打开、同步（推送新提交）、重新打开时触发
+
+# 3. 定义权限 (Permissions) - 推荐设置，用于评论 PR
+permissions:
+  contents: read # 允许读取仓库内容
+  pull-requests: write # 允许在 PR 上写评论（可选，用于报告漏洞）
+
+# 4. 定义 Job
+jobs:
+  # Job 名称
+  scan-sbom:
+    # Job 运行的环境
+    runs-on: ubuntu-latest # 推荐使用 Linux，因为 Syft/Grype 在 Linux 上支持最好
+
+    # 5. 定义 Job 的步骤 (Steps)
+    steps:
+      # Step 1: 检出代码 (Checkout your repository's code)
+      - name: Checkout code
+        uses: actions/checkout@v4 # 使用官方的 checkout Action
+
+      # Step 2: 安装 Syft (Install Syft)
+      - name: Install Syft
+        uses: anchore/syft-action/setup-syft@v3 # 使用 Anchore 官方提供的 Action
+        with:
+          syft-version: latest # 可以指定具体版本，如 '0.85.0'，或使用 'latest'
+
+      # Step 3: 安装 Grype (Install Grype)
+      - name: Install Grype
+        uses: anchore/grype-action/setup-grype@v2 # 使用 Anchore 官方提供的 Action
+        with:
+          grype-version: latest # 可以指定具体版本
+
+      # Step 4: 生成 SBOM (Generate SBOM)
+      - name: Generate SBOM with Syft
+        id: generate-sbom # 为这个步骤设置一个 id，方便后续步骤引用
+        run: |
+          # 运行 Syft 生成 SPDX 格式的 JSON SBOM 文件
+          syft . -o spdx-json=sbom.spdx.json
+          # 输出 SBOM 文件大小作为检查点（可选）
+          ls -lh sbom.spdx.json
+
+      # Step 5: 扫描 SBOM 中的漏洞 (Scan SBOM for Vulnerabilities)
+      - name: Scan SBOM for vulnerabilities with Grype
+        id: scan-vulns # 为这个步骤设置一个 id
+        run: |
+          # 运行 Grype 扫描生成的 SBOM 文件
+          # --fail-on <SEVERITY> 参数可以根据需要设置，如果发现指定严重性或更高的漏洞就失败
+          # 例如：--fail-on high, critical
+          grype sbom:sbom.spdx.json --output json --file grype-report.json
+          # 输出报告文件大小作为检查点（可选）
+          ls -lh grype-report.json
+
+      # Step 6: 上传 SBOM 和报告作为构件 (Upload SBOM and Report as Artifacts)
+      - name: Upload SBOM and Vulnerability Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-and-vulnerability-report
+          path: |
+            sbom.spdx.json
+            grype-report.json
+          retention-days: 30 # 保留 30 天
+
+     
+      # 一个更推荐的 Action 是 `advanced-security/grype-action`，它能直接在 PR 上创建注释并标记高危漏洞
+      - name: Report Vulnerabilities to GitHub Security Tab (Optional)
+        uses: advanced-security/grype-action@v1
+        with:
+          image: "" # 留空以扫描当前目录下的文件系统依赖
+          sbom: sbom.spdx.json
+          fail-build: false # 设置为 true 可以在发现漏洞时使 CI 失败
+          severity-cutoff: high # 只报告 high 及以上严重性的漏洞
